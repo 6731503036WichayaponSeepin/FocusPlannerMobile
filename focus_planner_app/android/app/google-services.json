@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "609073551752",
+    "project_id": "focus-planner888",
+    "storage_bucket": "focus-planner888.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:609073551752:android:49978177a7ed1c6c76023d",
+        "android_client_info": {
+          "package_name": "com.example.focus_planner_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwXr4n4UV3BixefFsF69RxB6WsiimSfT0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
