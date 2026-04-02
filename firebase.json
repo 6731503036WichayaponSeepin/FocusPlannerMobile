@@ -1,0 +1,8 @@
+{
+  "functions": [
+    {
+      "source": "notifications",
+      "codebase": "notifications"
+    }
+  ]
+}
