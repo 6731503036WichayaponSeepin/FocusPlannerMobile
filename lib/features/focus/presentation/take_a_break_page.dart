@@ -6,6 +6,7 @@ import '../../tasks/data/task_model.dart';
 import '../../tasks/data/task_repository.dart';
 import 'stay_focused_page.dart';
 import '../../../core/services/notification_service.dart';
+
 class TakeABreakPage extends StatefulWidget {
   final int breakMinutes;
   final String? taskId;
@@ -89,11 +90,11 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
   void _backToFocus() {
     _timer.cancel();
     
-      // ✅ แจ้งเตือน Break Complete
-  NotificationService().notifyBreakComplete(
-    breakMinutes: _breakTime,
-    sessionCount: _currentSessionCount,
-  );
+    // ✅ แจ้งเตือน Break Complete
+    NotificationService().notifyBreakComplete(
+      breakMinutes: _breakTime,
+      sessionCount: _currentSessionCount,
+    );
 
     // ✅ ถ้ายังไม่จบ session: ไป Focus ครั้งต่อไป
     Navigator.pushReplacement(
@@ -126,11 +127,11 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
           await _taskRepository.completeTask(task, focusTimeUsed);
 
           // ✅ แจ้งเตือน Task Completed
-        await NotificationService().notifyTaskCompleted(
-          taskTitle: widget.taskTitle ?? 'Task',
-          totalFocusTime: focusTimeUsed,
-          sessionsCompleted: _currentSessionCount,
-        );
+          await NotificationService().notifyTaskCompleted(
+            taskTitle: widget.taskTitle ?? 'Task',
+            totalFocusTime: focusTimeUsed,
+            sessionsCompleted: _currentSessionCount,
+          );
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -248,6 +249,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   ],
                 ),
                 const SizedBox(height: 40),
+
                 // ✅ Sleeping Cat
                 Container(
                   width: 150,
@@ -266,6 +268,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+
                 // ✅ Timer Circle
                 Container(
                   width: 200,
@@ -296,6 +299,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+
                 // ✅ Message
                 Text(
                   'Rest Your Eyes',
@@ -305,6 +309,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
                 // ✅ Session Counter
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -322,6 +327,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                   ),
                 ),
                 const SizedBox(height: 60),
+
                 // ✅ Buttons
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -363,7 +369,7 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _giveUpTask,  // ✅ เปลี่ยนเป็น Give Up
+                          onPressed: _giveUpTask,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red.withOpacity(0.2),
                             foregroundColor: Colors.red,
@@ -394,25 +400,28 @@ class _TakeABreakPageState extends State<TakeABreakPage> {
           ),
         ),
       ),
+
+      // ✅ แถบล่างเหมือนหน้า Home (4 tabs)
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         onTap: (index) {
-          if (index == 1) {
+          if (index != 0) {
             _timer.cancel();
-            _giveUpTask();  // ✅ เปลี่ยนเป็น Give Up
-          } else if (index == 2) {
-            _timer.cancel();
-            Navigator.of(context).pushNamed('/profile');
+            Navigator.pop(context);
           }
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.track_changes),
+            icon: Icon(Icons.flag),
             label: 'Focus',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Notifications',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

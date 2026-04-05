@@ -32,30 +32,25 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
   late int _totalFocusSeconds;
   late Timer _timer;
   bool _isPaused = false;
+  bool _isRunning = false; // ✅ เพิ่ม flag
   late int _breakTime;
   late int _currentSessionCount;
-  bool _notificationShown = false;  // ✅ เพิ่ม flag
+  bool _notificationShown = false;
 
   @override
   void initState() {
     super.initState();
     _currentSessionCount = widget.sessionCount;
     
-    // ✅ ถ้าเป็น session 1 ให้ใช้ initialMinutes
-    // ถ้า session > 1 ให้ reset เป็น initialMinutes ใหม่
     if (widget.sessionCount == 1) {
       _remainingSeconds = widget.remainingSeconds ?? (widget.initialMinutes * 60);
     } else {
-      // ✅ Session ต่อไป: reset เป็นเวลาใหม่
       _remainingSeconds = widget.initialMinutes * 60;
     }
     
     _totalFocusSeconds = widget.initialMinutes * 60;
     _loadBreakTimeFromSettings();
-    _startTimer();
-    
-    // ✅ แจ้งเตือนเมื่อเข้าหน้า Focus
-    _notifyFocusTimeStarted();
+    // ✅ ไม่เริ่มจับเวลาเองแล้ว
   }
 
   Future<void> _loadBreakTimeFromSettings() async {
@@ -71,24 +66,26 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
     }
   }
 
-  // ✅ แจ้งเตือนเมื่อเริ่มโฟกัส
-  Future<void> _notifyFocusTimeStarted() async {
-    try {
-      if (!_notificationShown) {
-        await NotificationService().notifyFocusTimeStarted(
-          taskTitle: widget.taskTitle,
-          focusMinutes: widget.initialMinutes,
-        );
-        _notificationShown = true;
-      }
-    } catch (e) {
-      debugPrint('Error notifying focus time started: $e');
-    }
-  }
-
+  // ✅ เริ่มจับเวลา
   void _startTimer() {
+    if (_isRunning) return; // ✅ ป้องกันเริ่มหลาย ครั้ง
+
+    // ✅ แจ้งเตือนเมื่อเริ่มโฟกัส
+    if (!_notificationShown) {
+      NotificationService().notifyFocusTimeStarted(
+        taskTitle: widget.taskTitle,
+        focusMinutes: widget.initialMinutes,
+      );
+      _notificationShown = true;
+    }
+
+    setState(() {
+      _isRunning = true;
+      _isPaused = false;
+    });
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!_isPaused) {
+      if (!_isPaused && _isRunning) {
         setState(() {
           if (_remainingSeconds > 0) {
             _remainingSeconds--;
@@ -105,11 +102,20 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
     setState(() => _isPaused = !_isPaused);
   }
 
-  // ✅ Focus หมด → auto-go Break (ไม่ถาม)
-  void _navigateToBreak() {
-    _timer.cancel();
+  void _resetTimer() {
+    if (_isRunning) {
+      _timer.cancel();
+    }
+    setState(() {
+      _remainingSeconds = widget.initialMinutes * 60;
+      _isRunning = false;
+      _isPaused = false;
+    });
+  }
 
-    // ✅ แจ้งเตือน Focus Complete
+  void _navigateToBreak() {
+    _isRunning = false;
+
     NotificationService().notifyFocusComplete(
       taskTitle: widget.taskTitle,
       sessionCount: _currentSessionCount,
@@ -123,7 +129,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
           breakMinutes: _breakTime,
           taskId: widget.taskId,
           taskTitle: widget.taskTitle,
-          focusRemainingSeconds: 0,  // ✅ ส่ง 0 (ไม่ใช้ remainingSeconds)
+          focusRemainingSeconds: 0,
           sessionCount: _currentSessionCount,
           totalSessions: widget.totalSessions,
           focusMinutes: widget.initialMinutes,
@@ -140,7 +146,9 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    if (_isRunning) {
+      _timer.cancel();
+    }
     super.dispose();
   }
 
@@ -150,7 +158,9 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
 
     return WillPopScope(
       onWillPop: () async {
-        _timer.cancel();
+        if (_isRunning) {
+          _timer.cancel();
+        }
         return true;
       },
       child: Scaffold(
@@ -171,7 +181,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // ✅ Header dengan wavy design
+                  // ✅ Header
                   Stack(
                     children: [
                       CustomPaint(
@@ -206,6 +216,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                     ],
                   ),
                   const SizedBox(height: 40),
+
                   // ✅ Task Title
                   Text(
                     widget.taskTitle,
@@ -217,6 +228,7 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 60),
+
                   // ✅ Timer Circle
                   Container(
                     width: 200,
@@ -224,13 +236,16 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Theme.of(context).primaryColor,
+                        color: _isRunning
+                            ? Colors.green
+                            : Theme.of(context).primaryColor,
                         width: 8,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context)
-                              .primaryColor
+                          color: (_isRunning
+                                  ? Colors.green
+                                  : Theme.of(context).primaryColor)
                               .withOpacity(0.5),
                           blurRadius: 20,
                           offset: const Offset(0, 0),
@@ -243,103 +258,78 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                         style: TextStyle(
                           fontSize: 56,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
+                          color: _isRunning
+                              ? Colors.green
+                              : Theme.of(context).primaryColor,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 40),
+
                   // ✅ Status
-                  Text(
-                    'Currently: ${_isPaused ? 'Paused' : 'Focus'}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDarkMode ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // ✅ Session Counter
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Session $_currentSessionCount of ${widget.totalSessions}',
+                  if (_isRunning)
+                    Text(
+                      _isPaused ? 'Currently: Paused' : 'Currently: Focus',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).primaryColor,
+                        fontSize: 16,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Ready to focus?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode
+                            ? Colors.white.withOpacity(0.7)
+                            : Colors.black54,
                       ),
                     ),
-                  ),
+                  const SizedBox(height: 20),
+
+                  // ✅ Session Counter
+                  if (_isRunning)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Session $_currentSessionCount of ${widget.totalSessions}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 60),
+
                   // ✅ Action Buttons
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       children: [
-                        // ✅ First Row - Pause/Resume + Complete Task
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _pauseTimer,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isDarkMode
-                                      ? Colors.white.withOpacity(0.12)
-                                      : Colors.black.withOpacity(0.1),
-                                  side: BorderSide(
-                                    color: isDarkMode
-                                        ? Colors.white.withOpacity(0.3)
-                                        : Colors.black.withOpacity(0.2),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  _isPaused ? 'Resume' : 'Pause',
-                                  style: TextStyle(
-                                    color: isDarkMode
-                                        ? Colors.white
-                                        : Colors.black87,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                        if (!_isRunning)
+                          // ✅ ยังไม่เริ่ม - แสดงปุ่ม Start
+                          ElevatedButton(
+                            onPressed: _startTimer,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(context).primaryColor,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  _timer.cancel();
-                                  final focusTimeUsed = widget.initialMinutes -
-                                      (_remainingSeconds ~/ 60);
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CompletedPage(
-                                        taskTitle: widget.taskTitle,
-                                        focusTimeMinutes: focusTimeUsed,
-                                        taskId: widget.taskId,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Theme.of(context).primaryColor,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Center(
                                 child: Text(
-                                  'Complete Task',
+                                  'Start Focus',
                                   style: TextStyle(
                                     color: isDarkMode
                                         ? Colors.black87
@@ -350,49 +340,162 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        // ✅ Skip to Break Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              _timer.cancel();
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TakeABreakPage(
-                                    breakMinutes: _breakTime,
-                                    taskId: widget.taskId,
-                                    taskTitle: widget.taskTitle,
-                                    focusRemainingSeconds: 0,  // ✅ ส่ง 0
-                                    sessionCount: _currentSessionCount,
-                                    totalSessions: widget.totalSessions,
-                                    focusMinutes: widget.initialMinutes,
+                          )
+                        else
+                          // ✅ กำลัง Focus - แสดงปุ่ม Pause/Resume + Complete
+                          Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: _pauseTimer,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isDarkMode
+                                            ? Colors.white.withOpacity(0.12)
+                                            : Colors.black.withOpacity(0.1),
+                                        side: BorderSide(
+                                          color: isDarkMode
+                                              ? Colors.white.withOpacity(0.3)
+                                              : Colors.black.withOpacity(0.2),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _isPaused ? 'Resume' : 'Pause',
+                                        style: TextStyle(
+                                          color: isDarkMode
+                                              ? Colors.white
+                                              : Colors.black87,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        _timer.cancel();
+                                        _isRunning = false;
+                                        final focusTimeUsed =
+                                            widget.initialMinutes -
+                                                (_remainingSeconds ~/ 60);
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                CompletedPage(
+                                              taskTitle: widget.taskTitle,
+                                              focusTimeMinutes: focusTimeUsed,
+                                              taskId: widget.taskId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(context)
+                                            .primaryColor,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Complete Task',
+                                        style: TextStyle(
+                                          color: isDarkMode
+                                              ? Colors.black87
+                                              : Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              // ✅ Skip to Break Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    _timer.cancel();
+                                    _isRunning = false;
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => TakeABreakPage(
+                                          breakMinutes: _breakTime,
+                                          taskId: widget.taskId,
+                                          taskTitle: widget.taskTitle,
+                                          focusRemainingSeconds: 0,
+                                          sessionCount: _currentSessionCount,
+                                          totalSessions: widget.totalSessions,
+                                          focusMinutes: widget.initialMinutes,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDarkMode
+                                        ? Colors.blue.shade700
+                                        : Colors.blue.shade600,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Skip to Break',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDarkMode
-                                  ? Colors.blue.shade700
-                                  : Colors.blue.shade600,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ),
-                            child: const Text(
-                              'Skip to Break',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
+                              const SizedBox(height: 12),
+                              // ✅ Reset Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: _resetTimer,
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: isDarkMode
+                                          ? Colors.white.withOpacity(0.3)
+                                          : Colors.black.withOpacity(0.2),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Reset',
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -402,25 +505,31 @@ class _StayFocusedPageState extends State<StayFocusedPage> {
             ),
           ),
         ),
+
+        // ✅ แถบล่างเหมือนหน้า Home
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: 0,
           onTap: (index) {
-            if (index == 1) {
-              _timer.cancel();
-              Navigator.of(context).pushNamed('/home');
-            } else if (index == 2) {
-              _timer.cancel();
-              Navigator.of(context).pushNamed('/profile');
+            if (index != 0) {
+              if (_isRunning) {
+                _timer.cancel();
+                _isRunning = false;
+              }
+              Navigator.pop(context);
             }
           },
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.track_changes),
+              icon: Icon(Icons.flag),
               label: 'Focus',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.home),
               label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications),
+              label: 'Notifications',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,12 +15,13 @@ import 'features/notifications/data/notification_repository.dart';
 import 'features/notifications/presentation/notifications_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// ✅ ขอ permission + setup listener
+/// ✅ ขอ permission + setup notification
 Future<void> setupFCM() async {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-  // ขอ permission
+  // 🔥 ขอ permission (Popup จะขึ้นตรงนี้)
   NotificationSettings settings = await messaging.requestPermission(
     alert: true,
     badge: true,
@@ -28,7 +30,27 @@ Future<void> setupFCM() async {
 
   print('Permission status: ${settings.authorizationStatus}');
 
-  // รับ notification ตอนแอปเปิด
+  if (settings.authorizationStatus == AuthorizationStatus.denied) {
+    print("❌ User denied notification permission");
+  } else if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    print("✅ User granted notification permission");
+  }
+
+  // 🔥 Android 13+ ต้องขอ permission เพิ่ม
+  if (Platform.isAndroid) {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+
+    final androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+    }
+  }
+
+  // 🔥 รับ notification ตอนแอปเปิด
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print("Foreground notification: ${message.notification?.title}");
   });
@@ -49,7 +71,7 @@ Future<void> saveFCMTokenForUser() async {
         .set({'fcmToken': token}, SetOptions(merge: true));
   }
 
-  // รองรับ token เปลี่ยน
+  // 🔥 รองรับ token เปลี่ยน
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
     await FirebaseFirestore.instance
         .collection('users')
@@ -61,12 +83,17 @@ Future<void> saveFCMTokenForUser() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  // ขอ permission ตั้งแต่เปิดแอป
-  await setupFCM();
+    // 🔥 ขอ permission ตอนเปิดแอป
+    await setupFCM();
+
+  } catch (e) {
+    print("❌ Firebase init error: $e");
+  }
 
   runApp(const FocusPlannerApp());
 }
@@ -88,7 +115,7 @@ class _FocusPlannerAppState extends State<FocusPlannerApp> {
       if (user != null) {
         print("User logged in: ${user.uid}");
 
-        // init notification repository
+        // init notification system
         final notifRepo = NotificationRepositoryImpl(userId: user.uid);
         NotificationService().initialize(notifRepo);
 
@@ -107,7 +134,8 @@ class _FocusPlannerAppState extends State<FocusPlannerApp> {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
-            title: 'Focus Timer App',
+            title: 'Focus Planner', // ✅ แก้ชื่อแอปแล้ว
+
             theme: themeProvider.lightTheme,
             darkTheme: themeProvider.darkTheme,
             themeMode:

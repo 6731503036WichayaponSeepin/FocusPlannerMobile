@@ -305,6 +305,12 @@ class _HomeTaskPageState extends State<HomeTaskPage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
+          // ✅ ถ้ากด Focus tab (index 0) ให้ไม่ทำอะไร
+          if (index == 0) {
+            return; // ไม่ต้องเปลี่ยน
+          }
+          
+          // ✅ กด tab อื่น ให้เปลี่ยน index
           setState(() => _selectedIndex = index);
         },
         items: const [

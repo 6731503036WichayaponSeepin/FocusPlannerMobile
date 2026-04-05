@@ -387,10 +387,9 @@ class _CompletedPageState extends State<CompletedPage> {
                           onPressed: _isSaving
                               ? null
                               : () {
-                                  Navigator.of(context).popUntil(
-                                    (route) =>
-                                        route.settings.name == '/' ||
-                                        route.isFirst,
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/home',
+                                    (route) => false,
                                   );
                                 },
                           style: ElevatedButton.styleFrom(
@@ -436,23 +435,30 @@ class _CompletedPageState extends State<CompletedPage> {
           ),
         ),
       ),
+
+      // ✅ แถบล่างเหมือนหน้า Home (4 tabs)
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         onTap: (index) {
-          if (index == 1) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          } else if (index == 2) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
+          if (index != 0) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/home',
+              (route) => false,
+            );
           }
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.track_changes),
+            icon: Icon(Icons.flag),
             label: 'Focus',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Notifications',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
